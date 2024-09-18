@@ -150,7 +150,7 @@ def process_multiple_images_func(result_df, initial_df, time_threshold):
     return combined_df
 
 # Interfaz de usuario en Streamlit
-st.title("LynxAutomator")
+st.title("LynxAutomator WI Wb")
 
 # Selector de idioma
 lang = st.selectbox("Seleccione el idioma / Select the language", ["es", "en", "pt"])
