@@ -469,7 +469,7 @@ process_multiple_images_st = st.sidebar.checkbox(tr["process_multiple_images"], 
 separate_large_groups_st = st.sidebar.checkbox(tr["separate_objects_gt_1"], value=False) # Default False
 
 # Time threshold input
-time_threshold_st = st.sidebar.number_input(tr["time_threshold"], min_value=1, value=30) # ExcelCombinerApp default is 3
+time_threshold_st = st.sidebar.number_input(tr["time_threshold"], min_value=1, value=3) # ExcelCombinerApp default is 3
 
 
 if 'final_df' not in st.session_state:
