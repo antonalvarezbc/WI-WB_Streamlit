@@ -93,7 +93,7 @@ translations = {
         "warning_download_empty": "No processed data available for download. The resulting Excel would be empty.",
         "error_download_not_available": "Files have not been processed yet or processing resulted in no data.",
         "error_initial_excel_empty": "The initial Excel file is empty or could not be read.",
-        "error_timestamp_conversion": "Error converting 'timestamp'. Ensure format is YYYY-MM-DD HH:MM:SS. Rows with invalid timestamps will be omitted."
+        "error_timestamp_conversion": "Error converting 'timestamp'. Ensure format is Polymy-MM-DD HH:MM:SS. Rows with invalid timestamps will be omitted."
     }
 }
 
@@ -311,7 +311,16 @@ def process_files_main(initial_excel_file_obj, images_csv_file_obj, deployments_
             st.error(current_lang_tr["error_no_initial_excel_selected"])
             return None
         
-        initial_df_dict = pd.read_excel(initial_excel_file_obj, sheet_name=None)
+        # Explicitly use openpyxl engine for reading .xlsx files
+        try:
+            initial_df_dict = pd.read_excel(initial_excel_file_obj, sheet_name=None, engine='openpyxl')
+        except ImportError:
+            st.error(f"{current_lang_tr['error_message']}La librería 'openpyxl' es necesaria para leer archivos Excel (.xlsx). Por favor, instálala usando 'pip install openpyxl'.")
+            return None
+        except Exception as e: # Catch other potential errors during read_excel
+            st.error(f"{current_lang_tr['error_message']}Al leer el archivo Excel inicial: {e}")
+            return None
+
         if not initial_df_dict:
             st.error(current_lang_tr["error_initial_excel_empty"])
             return None
@@ -407,11 +416,13 @@ def process_files_main(initial_excel_file_obj, images_csv_file_obj, deployments_
     except ValueError as ve:
         st.error(f"{current_lang_tr['error_message']}{ve}")
         return None
-    except KeyError as ke:
-        st.error(f"{current_lang_tr['error_message']}Columna crítica faltante en los archivos de entrada: {ke}. Por favor, verifique el contenido y la estructura del archivo.")
+    except KeyError as ke: # Catching KeyError for missing columns during operations
+        st.error(f"{current_lang_tr['error_message']}Columna crítica faltante durante el procesamiento: {ke}. Verifique los datos de entrada.")
         return None
-    except Exception as e:
+    except Exception as e: # General exception handler
         st.error(f"{current_lang_tr['error_message']}{e}")
+        # import traceback # Uncomment for detailed traceback in development
+        # st.error(traceback.format_exc()) # Uncomment for detailed traceback
         return None
 
 
