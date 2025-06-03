@@ -2,9 +2,8 @@ import streamlit as st
 import pandas as pd
 import re
 from io import BytesIO
-import os # Added for potential future use, though not strictly necessary for current ExcelCombinerApp port
 
-# Diccionario de traducciones (updated)
+# Diccionario de traducciones (actualizado)
 translations = {
     "es": {
         "select_initial_excel": "Selecciona el archivo Excel inicial",
@@ -26,11 +25,11 @@ translations = {
         "error_column_missing_in_deployments_csv": "La columna '{col}' falta en el archivo CSV de deployments.",
         "error_required_column_missing_in_merged_csv": "La columna requerida '{col}' falta en los datos combinados de imágenes/despliegues.",
         "error_no_initial_excel_selected": "No se ha seleccionado un archivo de Excel inicial.",
-        "file_saved_successfully": "Archivo guardado con éxito en {path}", # Primarily for Tkinter, but good to have
+        "file_saved_successfully": "Archivo guardado con éxito en {path}",
         "error_threshold_value": "El umbral de tiempo debe ser un número entero positivo.",
         "warning_empty_final_df": "El DataFrame final está vacío, pero había datos para procesar. Verifique los filtros y umbrales.",
         "info_no_valid_data": "No había datos válidos para procesar después de la carga inicial y combinación.",
-        "error_saving_file": "No se pudo guardar el archivo: ", # Primarily for Tkinter
+        "error_saving_file": "No se pudo guardar el archivo: ",
         "warning_download_empty": "No hay datos procesados para descargar. El Excel resultante estaría vacío.",
         "error_download_not_available": "Los archivos aún no se han procesado o el procesamiento no generó datos.",
         "error_initial_excel_empty": "El archivo Excel inicial está vacío o no se pudo leer.",
@@ -98,31 +97,27 @@ translations = {
     }
 }
 
-# Función para generar occurrenceID (adapted from ExcelCombinerApp)
+# Función para generar occurrenceID
 def generate_occurrence_id(row):
-    # Sanitized project_id and deployment_id as per ExcelCombinerApp's simple string conversion.
-    # WI_WB.py's original re.sub was more robust for characters, but ExcelCombinerApp uses simple string.
-    # To match ExcelCombinerApp, subproject_name is NOT included here.
     sanitized_project_id = str(row['project_id']) if pd.notna(row['project_id']) else ''
     sanitized_deployment_id = str(row['deployment_id']) if pd.notna(row['deployment_id']) else ''
     return f"{sanitized_project_id}-{sanitized_deployment_id}"
 
-# Asegurar que la extensión del archivo es .JPG (adapted from ExcelCombinerApp)
+# Asegurar que la extensión del archivo es .JPG
 def ensure_jpg_extension(location):
     if pd.isna(location):
-        return pd.NA # Use pd.NA for consistency
+        return pd.NA 
     location_str = str(location)
     parts = location_str.split('.')
-    if len(parts) > 1: # If has an extension
+    if len(parts) > 1: 
         base_name = '.'.join(parts[:-1])
-        return base_name + '.JPG' # Standardizes to .JPG
-    return location_str + '.JPG' # If no extension, adds .JPG
+        return base_name + '.JPG' 
+    return location_str + '.JPG'
 
-# Función para procesar una sola imagen por fila (New, adapted from ExcelCombinerApp)
+# Función para procesar una sola imagen por fila
 def process_single_image_per_row(result_df_input, initial_df_template):
     result_df = result_df_input.copy().reset_index(drop=True)
     initial_df = initial_df_template.copy()
-
     combined_rows = []
 
     for _, row in result_df.iterrows():
@@ -139,7 +134,7 @@ def process_single_image_per_row(result_df_input, initial_df_template):
 
         new_row_dict['Occurrence.occurrenceID'] = generate_occurrence_id(row)
         
-        ts = row['timestamp'] # Assumed to be datetime object already
+        ts = row['timestamp'] 
         new_row_dict['Encounter.year'] = ts.year
         new_row_dict['Encounter.month'] = ts.month
         new_row_dict['Encounter.day'] = ts.day
@@ -175,39 +170,32 @@ def process_single_image_per_row(result_df_input, initial_df_template):
         if col not in final_ordered_columns and col in combined_df.columns:
             final_ordered_columns.append(col)
     
-    for col in combined_df.columns: # Add any other generated columns not in initial_df or the main list
+    for col in combined_df.columns: 
         if col not in final_ordered_columns:
             final_ordered_columns.append(col)
             
     combined_df = combined_df.reindex(columns=final_ordered_columns, fill_value=pd.NA)
     return combined_df
 
-# Función para procesar múltiples imágenes (Updated, adapted from ExcelCombinerApp)
+# Función para procesar múltiples imágenes
 def process_multiple_images_func(result_df_input, initial_df_template, time_threshold, current_lang_tr):
     result_df = result_df_input.copy().reset_index(drop=True)
     initial_df = initial_df_template.copy()
 
     if not isinstance(time_threshold, int) or time_threshold <= 0:
         st.error(current_lang_tr["error_threshold_value"])
-        # Return empty DataFrame with initial_df schema if threshold is invalid
-        # This part is tricky as we need a schema that includes potential mediaAssets
-        # For simplicity, return an empty DataFrame or one based on initial_df
         return pd.DataFrame(columns=initial_df.columns)
 
-
-    # Ensure 'timestamp' is datetime
     if not pd.api.types.is_datetime64_any_dtype(result_df['timestamp']):
         result_df['timestamp'] = pd.to_datetime(result_df['timestamp'], errors='coerce')
         result_df = result_df.dropna(subset=['timestamp'])
 
     if result_df.empty:
-        # Construct empty DataFrame with expected schema
         temp_final_cols = list(initial_df.columns)
         default_cols_to_ensure = ['Occurrence.occurrenceID', 'Encounter.decimalLatitude', 'Encounter.decimalLongitude', 
                                   'Encounter.verbatimLocality', 'Encounter.year', 
-                                  'Encounter.month', 'Encounter.day', 'Encounter.hour', 'Encounter.minutes']
-        # Ensure at least 'Encounter.mediaAsset0' for schema if empty
-        default_cols_to_ensure.append('Encounter.mediaAsset0')
+                                  'Encounter.month', 'Encounter.day', 'Encounter.hour', 'Encounter.minutes',
+                                  'Encounter.mediaAsset0']
         for c in default_cols_to_ensure:
             if c not in temp_final_cols:
                 temp_final_cols.insert(0, c)
@@ -249,7 +237,7 @@ def process_multiple_images_func(result_df_input, initial_df_template, time_thre
             
             image_event_accumulator.append(image_row)
         
-        if image_event_accumulator: # Process remaining images in accumulator
+        if image_event_accumulator: 
             base_event_row_data = image_event_accumulator[0]
             new_combined_row = {
                 'Encounter.decimalLatitude': base_event_row_data['latitude'],
@@ -274,7 +262,7 @@ def process_multiple_images_func(result_df_input, initial_df_template, time_thre
         default_cols_to_ensure = ['Occurrence.occurrenceID', 'Encounter.decimalLatitude', 'Encounter.decimalLongitude', 
                                   'Encounter.verbatimLocality', 'Encounter.year', 
                                   'Encounter.month', 'Encounter.day', 'Encounter.hour', 'Encounter.minutes']
-        for i in range(max_assets_in_any_group if max_assets_in_any_group > 0 else 1): # Ensure at least mediaAsset0
+        for i in range(max_assets_in_any_group if max_assets_in_any_group > 0 else 1): 
             default_cols_to_ensure.append(f'Encounter.mediaAsset{i}')
         for c in default_cols_to_ensure:
             if c not in temp_final_cols:
@@ -307,7 +295,7 @@ def process_multiple_images_func(result_df_input, initial_df_template, time_thre
         if col not in ordered_cols and col in final_combined_df.columns:
             ordered_cols.append(col)
             
-    for col in final_combined_df.columns: # Add any other generated columns
+    for col in final_combined_df.columns: 
         if col not in ordered_cols:
             ordered_cols.append(col)
             
@@ -315,28 +303,24 @@ def process_multiple_images_func(result_df_input, initial_df_template, time_thre
     return final_combined_df
 
 
-# Función para procesar archivos (Main logic, significantly updated from ExcelCombinerApp)
-def process_files_main(initial_excel_path, images_csv_path, deployments_csv_path, 
+# Función principal para procesar archivos
+def process_files_main(initial_excel_file_obj, images_csv_file_obj, deployments_csv_file_obj, 
                        process_multiple_images_opt, time_threshold_opt, separate_large_groups_opt, current_lang_tr):
     try:
-        # Load initial Excel
-        if not initial_excel_path:
+        if not initial_excel_file_obj:
             st.error(current_lang_tr["error_no_initial_excel_selected"])
             return None
         
-        # Use BytesIO as Streamlit file uploader gives file-like objects
-        initial_df_dict = pd.read_excel(initial_excel_path, sheet_name=None)
+        initial_df_dict = pd.read_excel(initial_excel_file_obj, sheet_name=None)
         if not initial_df_dict:
             st.error(current_lang_tr["error_initial_excel_empty"])
             return None
         first_sheet_name = list(initial_df_dict.keys())[0]
         initial_df = initial_df_dict[first_sheet_name].reset_index(drop=True)
 
-        # Load CSVs
-        images_df = pd.read_csv(images_csv_path, dtype=str, low_memory=False)
-        deployments_df = pd.read_csv(deployments_csv_path, dtype=str, low_memory=False)
+        images_df = pd.read_csv(images_csv_file_obj, dtype=str, low_memory=False)
+        deployments_df = pd.read_csv(deployments_csv_file_obj, dtype=str, low_memory=False)
 
-        # --- START: Verificaciones de columnas esenciales para la fusión ---
         required_merge_cols = ['project_id', 'deployment_id']
         for col in required_merge_cols:
             if col not in images_df.columns:
@@ -349,38 +333,33 @@ def process_files_main(initial_excel_path, images_csv_path, deployments_csv_path
         merged_df = images_df.merge(deployments_df, on=['project_id', 'deployment_id'], suffixes=('_image', '_deployment'))
         merged_df = merged_df.reset_index(drop=True)
 
-        required_cols_for_result_df = ['latitude', 'longitude', 'placename', 'location', 'timestamp', 'project_id', 'deployment_id', 'subproject_name'] # subproject_name is in ExcelCombinerApp's list
+        required_cols_for_result_df = ['latitude', 'longitude', 'placename', 'location', 'timestamp', 'project_id', 'deployment_id', 'subproject_name']
         
-        # Add 'number_of_objects' if not present, default to '1'
         if 'number_of_objects' not in merged_df.columns:
             merged_df['number_of_objects'] = '1' 
         
-        # Ensure all required columns exist in merged_df
         for col in required_cols_for_result_df:
             if col not in merged_df.columns:
                 st.error(current_lang_tr["error_required_column_missing_in_merged_csv"].format(col=col))
                 return None
         
-        # Always include 'number_of_objects' in the selection if it wasn't already in required_cols_for_result_df (it wasn't)
         cols_to_select_for_result = required_cols_for_result_df + ['number_of_objects']
-        result_df = merged_df[list(dict.fromkeys(cols_to_select_for_result))].copy() # list(dict.fromkeys()) to ensure unique cols
+        result_df = merged_df[list(dict.fromkeys(cols_to_select_for_result))].copy()
             
-        # Convert timestamp
         original_row_count = len(result_df)
-        result_df['timestamp'] = pd.to_datetime(result_df['timestamp'], errors='coerce')
+        result_df['timestamp'] = pd.to_datetime(result_df['timestamp'], errors='coerce') # format='%Y-%m-%d %H:%M:%S'
         result_df = result_df.dropna(subset=['timestamp'])
         if len(result_df) < original_row_count:
             st.warning(current_lang_tr["error_timestamp_conversion"])
 
-
         if result_df.empty:
             st.info(current_lang_tr["info_no_valid_data"])
-            return pd.DataFrame() # Return empty DataFrame
+            return pd.DataFrame() 
 
         final_df = pd.DataFrame()
 
         if separate_large_groups_opt:
-            if 'number_of_objects' not in result_df.columns: # Should be there by now
+            if 'number_of_objects' not in result_df.columns: 
                  result_df['number_of_objects'] = '1' 
             
             result_df['number_of_objects'] = pd.to_numeric(result_df['number_of_objects'], errors='coerce').fillna(0)
@@ -391,7 +370,6 @@ def process_files_main(initial_excel_path, images_csv_path, deployments_csv_path
             processed_dfs = []
 
             if not large_objects_df.empty:
-                # Images with >1 object are always processed one image per row
                 processed_large_df = process_single_image_per_row(large_objects_df, initial_df)
                 processed_dfs.append(processed_large_df)
 
@@ -404,25 +382,23 @@ def process_files_main(initial_excel_path, images_csv_path, deployments_csv_path
             
             if processed_dfs:
                 final_df = pd.concat(processed_dfs, ignore_index=True)
-            else: # If both large_objects_df and other_objects_df were empty or resulted in empty processed DFs
+            else: 
                 final_df = pd.DataFrame()
 
-
-        else: # Not separating by 'number_of_objects'
+        else: 
             if process_multiple_images_opt:
                 final_df = process_multiple_images_func(result_df.copy(), initial_df, time_threshold_opt, current_lang_tr)
             else:
                 final_df = process_single_image_per_row(result_df.copy(), initial_df)
         
-        # Final messages
-        if final_df is None: # Should not happen if functions return empty DFs instead of None
-            st.error(current_lang_tr["error_message"] + "Processing returned None.")
+        if final_df is None: 
+            st.error(current_lang_tr["error_message"] + "El procesamiento devolvió None.")
             return pd.DataFrame()
             
-        if final_df.empty and not result_df.empty : # result_df had data, but final_df is empty
+        if final_df.empty and not result_df.empty : 
             st.warning(current_lang_tr["warning_empty_final_df"])
-        elif final_df.empty and result_df.empty: # result_df was empty initially
-            st.info(current_lang_tr["info_no_valid_data"]) # Already shown above, but good fallback
+        elif final_df.empty and result_df.empty: 
+            st.info(current_lang_tr["info_no_valid_data"]) 
         elif not final_df.empty:
             st.success(current_lang_tr["process_completed"])
         
@@ -432,52 +408,48 @@ def process_files_main(initial_excel_path, images_csv_path, deployments_csv_path
         st.error(f"{current_lang_tr['error_message']}{ve}")
         return None
     except KeyError as ke:
-        st.error(f"{current_lang_tr['error_message']}Missing critical column in input files: {ke}. Please check file contents and structure.")
+        st.error(f"{current_lang_tr['error_message']}Columna crítica faltante en los archivos de entrada: {ke}. Por favor, verifique el contenido y la estructura del archivo.")
         return None
     except Exception as e:
         st.error(f"{current_lang_tr['error_message']}{e}")
-        # import traceback # For more detailed debugging if needed
-        # st.error(traceback.format_exc())
         return None
 
 
-# --- Streamlit UI ---
-st.set_page_config(layout="wide")
+# --- Interfaz de Usuario Streamlit ---
+st.set_page_config(layout="centered") # 'centered' or 'wide'
 st.title("LynxAutomator WI Wb")
 
-# Language selector
+# Selector de idioma en la barra lateral
 lang_options = list(translations.keys())
 lang_selected_label = "Seleccione el idioma / Select the language / Selecione o idioma"
-# Use a consistent key for the language selector itself, or show all options
 lang = st.sidebar.selectbox(lang_selected_label, lang_options, format_func=lambda x: {"es": "Español", "en": "English", "pt": "Português"}[x])
 tr = translations[lang]
 
+# Controles de carga de archivos en la barra lateral
 st.sidebar.header(tr["select_initial_excel"])
 initial_excel_file = st.sidebar.file_uploader(tr["browse_excel"], type=['xlsx', 'xls'], label_visibility="collapsed")
 
 st.sidebar.header(tr["select_images_csv"])
-images_csv_file = st.sidebar.file_uploader(tr["browse_csv"] + " (Images)", type=['csv'], label_visibility="collapsed")
+images_csv_file = st.sidebar.file_uploader(tr["browse_csv"] + " (Imágenes)", type=['csv'], label_visibility="collapsed")
 
 st.sidebar.header(tr["select_deployments_csv"])
-deployments_csv_file = st.sidebar.file_uploader(tr["browse_csv"] + " (Deployments)", type=['csv'], label_visibility="collapsed")
+deployments_csv_file = st.sidebar.file_uploader(tr["browse_csv"] + " (Despliegues)", type=['csv'], label_visibility="collapsed")
 
+# Opciones de procesamiento en la barra lateral
 st.sidebar.header("Opciones de Procesamiento")
-# Checkbox for "Process multiple images (group by time)"
-process_multiple_images_st = st.sidebar.checkbox(tr["process_multiple_images"], value=False) # Default to False like ExcelCombinerApp for this particular option when it's one of two main paths.
-
-# Checkbox for "Separate if objects > 1"
-separate_large_groups_st = st.sidebar.checkbox(tr["separate_objects_gt_1"], value=False) # Default False
-
-# Time threshold input
-time_threshold_st = st.sidebar.number_input(tr["time_threshold"], min_value=1, value=30) # ExcelCombinerApp default is 3
+process_multiple_images_st = st.sidebar.checkbox(tr["process_multiple_images"], value=False)
+separate_large_groups_st = st.sidebar.checkbox(tr["separate_objects_gt_1"], value=False)
+time_threshold_st = st.sidebar.number_input(tr["time_threshold"], min_value=1, value=3, step=1)
 
 
+# Estado de sesión para el DataFrame final
 if 'final_df' not in st.session_state:
     st.session_state.final_df = None
 
-# Process button
+# Botón de procesar en la barra lateral
 if st.sidebar.button(tr["process_files"]):
     if initial_excel_file and images_csv_file and deployments_csv_file:
+        # Llama a la función principal de procesamiento
         st.session_state.final_df = process_files_main(
             initial_excel_file, 
             images_csv_file, 
@@ -485,38 +457,40 @@ if st.sidebar.button(tr["process_files"]):
             process_multiple_images_st, 
             time_threshold_st,
             separate_large_groups_st,
-            tr # Pass current language translations
+            tr 
         )
     else:
-        missing_files_msg = ""
-        if not initial_excel_file: missing_files_msg += tr["no_excel_selected"] + " "
-        if not images_csv_file or not deployments_csv_file: missing_files_msg += tr["no_csv_selected"]
-        st.sidebar.error(missing_files_msg.strip())
-        st.session_state.final_df = None # Clear previous results if files are missing
+        # Mensaje de error si faltan archivos
+        missing_files_msg_parts = []
+        if not initial_excel_file: missing_files_msg_parts.append(tr["no_excel_selected"])
+        if not images_csv_file: missing_files_msg_parts.append(tr["no_csv_selected"] + " (Imágenes)")
+        if not deployments_csv_file: missing_files_msg_parts.append(tr["no_csv_selected"] + " (Despliegues)")
+        st.sidebar.error(" ".join(missing_files_msg_parts))
+        st.session_state.final_df = None 
 
-# Display results and download button
+# Mostrar resultados y botón de descarga en el área principal
 if st.session_state.final_df is not None:
     if not st.session_state.final_df.empty:
+        st.write("### Resultados del Procesamiento") # Título para la tabla de resultados
         st.dataframe(st.session_state.final_df)
         
         buffer = BytesIO()
-        # Use openpyxl as xlsxwriter might have issues in some restricted Streamlit envs for complex files, though usually fine.
-        # ExcelCombinerApp implicitly uses default engine of to_excel which is often openpyxl for .xlsx
-        with pd.ExcelWriter(buffer, engine='openpyxl') as writer: # Matched default engine often used
-            st.session_state.final_df.to_excel(writer, index=False, sheet_name='Results')
-        
-        st.download_button(
-            label=tr["download_excel"],
-            data=buffer,
-            file_name="resultados_procesados.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" # Correct MIME for .xlsx
-        )
-    else:
-        # If final_df is an empty DataFrame, it means processing might have occurred but yielded no results
-        # Messages for this are handled within process_files_main now.
-        # We can add a specific message here if needed, e.g., "Processing complete, no data to display."
-        pass
+        # Usar xlsxwriter como motor. Si este también falla, podrías necesitar instalarlo.
+        try:
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer: 
+                st.session_state.final_df.to_excel(writer, index=False, sheet_name='Resultados')
+            
+            st.download_button(
+                label=tr["download_excel"],
+                data=buffer,
+                file_name="resultados_procesados.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+        except Exception as e:
+            st.error(f"Error al generar el archivo Excel para descarga: {e}. Asegúrate de tener 'xlsxwriter' instalado (`pip install xlsxwriter`).")
 
-elif st.session_state.final_df is None and not (initial_excel_file and images_csv_file and deployments_csv_file):
-    # This case might be if the button wasn't pressed yet or if files were deselected after an error
-    pass
+    # No se muestra nada explícito si final_df es un DataFrame vacío,
+    # ya que los mensajes de advertencia/info se manejan dentro de process_files_main.
+elif st.session_state.final_df is None:
+    # Mensaje inicial o si no se han cargado archivos y presionado procesar
+    st.info("Por favor, cargue los archivos y configure las opciones en la barra lateral, luego presione 'Procesar Archivos'.")
